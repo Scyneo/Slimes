@@ -7,7 +7,7 @@ import cupyx.scipy.signal
 pg.init()
 
 WIDTH = 1280
-HEIGHT = 720
+HEIGHT = 800
 FONT = pg.font.SysFont("Arial", 18, bold=True)
 
 
@@ -19,11 +19,13 @@ class Animation:
 		self.alpha_surf = pg.Surface(self.screen.get_size(), pg.SRCALPHA)
 		self.surf = np.empty((WIDTH, HEIGHT, 3))
 		self.kernel = cp.ones((3, 3), float) / 9.5
+		self.slime_group = pg.sprite.Group()
 
 	def run(self):
 		slimes = {}
 		for i in range(5000):
-			slimes[i] = Slime((np.random.randint(WIDTH), np.random.randint(HEIGHT)))
+			slimes[i] = Slime((np.random.randint(WIDTH), np.random.randint(HEIGHT)), self.slime_group)
+
 		while True:
 			for event in pg.event.get():
 				if event.type == pg.QUIT:
@@ -34,10 +36,11 @@ class Animation:
 			self.clock.tick(30)
 			self.screen.fill("black")
 
-			array = pg.surfarray.array3d(self.alpha_surf)
+			Slime.array = pg.surfarray.array3d(self.alpha_surf)
 			for slime in slimes.values():
-				slime.turn(array)
-				slime.update()
+				slime.turn()
+			self.slime_group.update()
+			for slime in self.slime_group:
 				pg.draw.rect(self.alpha_surf, (255, 255, 255), slime)
 			self.update_screen()
 			self.screen.blit(self.alpha_surf, (0, 0))
@@ -57,15 +60,16 @@ class Animation:
 
 
 class Slime(pg.sprite.Sprite):
+	array = None
 	turn_speed = 10
 	delta_time = 1
 	sensor_offset_distance = 35
 	sensor_size = 1
 	sense_weight = 3.0
 
-	def __init__(self, pos, *args):
-		super().__init__(*args)
-		self.image = pg.Surface((4, 4), pg.SRCALPHA)
+	def __init__(self, pos, group):
+		super().__init__(group)
+		self.image = pg.Surface((2, 2), pg.SRCALPHA)
 		self.rect = self.image.get_rect(center=pos)
 		self.direction = pg.math.Vector2()
 		self.pos = pg.math.Vector2(pos)
@@ -80,7 +84,7 @@ class Slime(pg.sprite.Sprite):
 		self.angle = self.direction.as_polar()[1]
 
 	@staticmethod
-	def sense(slime, angle_offset, array):
+	def sense(slime, angle_offset):
 		sensor_angle = slime.angle + angle_offset
 		sensor_direction = pg.math.Vector2(1, 0).rotate(sensor_angle)
 
@@ -93,13 +97,13 @@ class Slime(pg.sprite.Sprite):
 			for offset_y in range(-Slime.sensor_size, Slime.sensor_size + 1):
 				sample_x = min(WIDTH-1, max(0, sensor_x + offset_x))
 				sample_y = min(HEIGHT-1, max(0, sensor_y + offset_y))
-				sum += Slime.sense_weight * array[sample_x, sample_y, 0]
+				sum += Slime.sense_weight * Slime.array[sample_x, sample_y, 0]
 		return sum
 
-	def turn(self, array):
-		weight_forward = self.sense(self, 0, array)
-		weight_left = self.sense(self, 90, array)
-		weight_right = self.sense(self, -90, array)
+	def turn(self):
+		weight_forward = self.sense(self, 0)
+		weight_left = self.sense(self, 90)
+		weight_right = self.sense(self, -90)
 		random_steer = np.random.uniform()
 		turning_speed = Slime.turn_speed * 2 * 3.1415
 
