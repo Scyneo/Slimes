@@ -2,8 +2,6 @@ import pygame as pg
 import sys
 import numpy as np
 import scipy.signal
-import cupy as cp
-import cupyx.scipy.signal
 pg.init()
 
 WIDTH = 1280
@@ -18,12 +16,12 @@ class Animation:
 		self.clock = pg.time.Clock()
 		self.alpha_surf = pg.Surface(self.screen.get_size(), pg.SRCALPHA)
 		self.surf = np.empty((WIDTH, HEIGHT, 3))
-		self.kernel = cp.ones((3, 3), float) / 9.5
+		self.kernel = np.ones((3, 3), float) / 9.5
 		self.slime_group = pg.sprite.Group()
 
 	def run(self):
 		slimes = {}
-		for i in range(5000):
+		for i in range(1500):
 			slimes[i] = Slime((np.random.randint(WIDTH), np.random.randint(HEIGHT)), self.slime_group)
 
 		while True:
@@ -37,6 +35,7 @@ class Animation:
 			self.screen.fill("black")
 
 			Slime.array = pg.surfarray.array3d(self.alpha_surf)
+
 			for slime in slimes.values():
 				slime.turn()
 			self.slime_group.update()
@@ -46,11 +45,13 @@ class Animation:
 			self.screen.blit(self.alpha_surf, (0, 0))
 			self.fps_counter()
 			pg.display.update()
+			
 
 	def update_screen(self):
-		self.surf[:, :, :] = cp.asnumpy(cupyx.scipy.signal.convolve2d(
-								cp.array(pg.surfarray.array3d(self.alpha_surf))[:, :, 0],
-								self.kernel, mode="same", boundary="fill").reshape(WIDTH, HEIGHT, 1))
+		self.surf[:, :, :] = scipy.signal.convolve2d(
+								pg.surfarray.array3d(self.alpha_surf)[:, :, 0],
+								self.kernel, mode="same", boundary="fill").reshape(WIDTH, HEIGHT, 1)
+		
 		self.alpha_surf.blit(pg.surfarray.make_surface(self.surf), (0, 0))
 
 	def fps_counter(self):
